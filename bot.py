@@ -9,8 +9,8 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-# Токен бота из переменных окружения
-BOT_TOKEN = os.environ.get('BOT_TOKEN', "8204345196:AAGa9ckArC5xUNSixAMtwTlY_NMGFYGnzDk")
+# Токен нового бота
+BOT_TOKEN = os.environ.get('BOT_TOKEN', "8390604966:AAE39zuCSl9vfUjPZERJ2ncR8mTBrXr9rBU")
 
 # На Render используем относительные пути
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -20,21 +20,32 @@ DRINKS_DATABASE = {
     "Кофе": {
         "Афогато": os.path.join(BASE_DIR, "tech_cards", "Афогато.PNG"),
         "Капучино Вареная сгущенка с халвой": os.path.join(BASE_DIR, "tech_cards", "Капучино Вареная сгущенка с халвой.PNG"),
-        # Можно добавить другие кофейные напитки
+        "Эспрессо": os.path.join(BASE_DIR, "tech_cards", "Эспрессо.PNG"),
+        "Латте": os.path.join(BASE_DIR, "tech_cards", "Латте.PNG"),
+        "Американо": os.path.join(BASE_DIR, "tech_cards", "Американо.PNG"),
     },
     "Холодные напитки": {
         "Время лайма": os.path.join(BASE_DIR, "tech_cards", "Время лайма.PNG"),
         "Гуанабана": os.path.join(BASE_DIR, "tech_cards", "Гуанабана.PNG"),
         "Карибский ананас": os.path.join(BASE_DIR, "tech_cards", "Карибский ананас.PNG"),
         "Личи-драгонфрут": os.path.join(BASE_DIR, "tech_cards", "Личи-драгонфрут.PNG"),
+        "Мохито": os.path.join(BASE_DIR, "tech_cards", "Мохито.PNG"),
     },
     "Сезонные напитки": {
-        # Добавь сезонные напитки здесь
         "Глинтвейн": os.path.join(BASE_DIR, "tech_cards", "Глинтвейн.PNG"),
+        "Тыквенный латте": os.path.join(BASE_DIR, "tech_cards", "Тыквенный латте.PNG"),
+        "Яблочный сидр": os.path.join(BASE_DIR, "tech_cards", "Яблочный сидр.PNG"),
     },
     "Чай": {
-        # Добавь чайные напитки здесь
         "Молочный улун": os.path.join(BASE_DIR, "tech_cards", "Молочный улун.PNG"),
+        "Эрл Грей": os.path.join(BASE_DIR, "tech_cards", "Эрл Грей.PNG"),
+        "Зеленый чай": os.path.join(BASE_DIR, "tech_cards", "Зеленый чай.PNG"),
+        "Чай масала": os.path.join(BASE_DIR, "tech_cards", "Чай масала.PNG"),
+    },
+    "Лимонады": {
+        "Классический лимонад": os.path.join(BASE_DIR, "tech_cards", "Классический лимонад.PNG"),
+        "Малиновый лимонад": os.path.join(BASE_DIR, "tech_cards", "Малиновый лимонад.PNG"),
+        "Мятный лимонад": os.path.join(BASE_DIR, "tech_cards", "Мятный лимонад.PNG"),
     }
 }
 
@@ -114,10 +125,15 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = """
 👋 Привет! Я бот для поиска техкарт напитков.
 
-📝 Выбери категорию напитков ниже, затем конкретный напиток - и я отправлю его техкарту.
+🏷️ **Как пользоваться:**
+1. Выбери категорию напитков
+2. Нажми на кнопку с названием напитка
+3. Получи техкарту!
 
 ✨ Можно также написать название напитка вручную.
-"""
+
+📊 **Всего напитков в базе:** {total_drinks}
+""".format(total_drinks=sum(len(drinks) for drinks in DRINKS_DATABASE.values()))
     
     # Отправляем сообщение с главной клавиатурой
     await update.message.reply_text(
@@ -203,7 +219,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 error_msg = f"❌ Ошибка при отправке техкарты: {str(e)}"
                 print(error_msg)
                 await update.message.reply_text(
-                    error_msg,
+                    "❌ Ошибка при отправке техкарты. Попробуйте еще раз.",
                     reply_markup=create_main_keyboard()
                 )
         else:
@@ -237,29 +253,53 @@ def main():
     """Запуск бота"""
     print("✅ Бот запускается...")
     print(f"📁 Рабочая директория: {BASE_DIR}")
+    print(f"🔑 Токен бота: {BOT_TOKEN[:10]}...")  # Показываем только начало токена для безопасности
     
     # Показываем структуру базы данных
     print("📊 Структура базы данных:")
+    total_drinks = 0
     for category, drinks in DRINKS_DATABASE.items():
-        print(f"  🏷️ {category}: {len(drinks)} напитков")
+        drink_count = len(drinks)
+        total_drinks += drink_count
+        print(f"  🏷️ {category}: {drink_count} напитков")
         for drink in drinks:
-            print(f"    🍹 {drink}")
+            file_exists = "✅" if os.path.exists(DRINKS_DATABASE[category][drink]) else "❌"
+            print(f"    {file_exists} {drink}")
     
-    # Создаем приложение бота
-    application = Application.builder().token(BOT_TOKEN).build()
+    print(f"🍹 Всего напитков: {total_drinks}")
     
-    # Добавляем обработчики команд
-    application.add_handler(CommandHandler("start", start_command))
-    application.add_handler(CommandHandler("menu", show_menu_command))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    
-    # Обработчик ошибок
-    application.add_error_handler(error_handler)
-    
-    # Запускаем бота
-    print("🤖 Бот запущен и готов к работе!")
-    print("⏹️  Для остановки нажми Ctrl+C")
-    application.run_polling()
+    try:
+        # Создаем приложение бота
+        application = Application.builder().token(BOT_TOKEN).build()
+        
+        # Добавляем обработчики команд
+        application.add_handler(CommandHandler("start", start_command))
+        application.add_handler(CommandHandler("menu", show_menu_command))
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+        
+        # Обработчик ошибок
+        application.add_error_handler(error_handler)
+        
+        # Запускаем бота с обработкой конфликта
+        print("🤖 Бот запущен и готов к работе!")
+        print("🔄 Режим: polling")
+        print("⏹️  Для остановки нажми Ctrl+C")
+        
+        # Запускаем с очисткой pending updates
+        application.run_polling(
+            drop_pending_updates=True,
+            allowed_updates=Update.ALL_TYPES
+        )
+        
+    except Exception as e:
+        print(f"❌ Критическая ошибка при запуске: {e}")
+        print("🔄 Попытка перезапуска через 10 секунд...")
+        import time
+        time.sleep(10)
+        main()  # Перезапускаем бота
+
+if __name__ == "__main__":
+    main()
 
 if __name__ == "__main__":
     main()
