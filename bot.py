@@ -9,10 +9,10 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-# Токен бота
-BOT_TOKEN = os.environ.get('BOT_TOKEN', '8204345196:AAGa9ckArC5xUNSixAMtwTlY_NMGFYGnzDk')
+# Токен бота из переменных окружения
+BOT_TOKEN = os.environ.get('BOT_TOKEN', "8204345196:AAGa9ckArC5xUNSixAMtwTlY_NMGFYGnzDk")
 
-# БАЗА НАПИТКОВ
+# На Render используем относительные пути
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 DRINKS_DATABASE = {
@@ -28,6 +28,7 @@ def create_drinks_keyboard():
     """Создает клавиатуру с кнопками напитков"""
     drinks = list(DRINKS_DATABASE.keys())
     
+    # Создаем кнопки (по 2 в ряд для красоты)
     keyboard = []
     for i in range(0, len(drinks), 2):
         row = []
@@ -37,6 +38,7 @@ def create_drinks_keyboard():
             row.append(KeyboardButton(drinks[i + 1]))
         keyboard.append(row)
     
+    # Добавляем кнопку "Показать все напитки"
     keyboard.append([KeyboardButton("📋 Показать все напитки")])
     
     return ReplyKeyboardMarkup(
@@ -55,6 +57,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ✨ Можно также написать название напитка вручную.
 """
     
+    # Отправляем сообщение с клавиатурой
     await update.message.reply_text(
         welcome_text,
         reply_markup=create_drinks_keyboard()
@@ -66,6 +69,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     print(f"🔍 Пользователь написал: '{user_message}'")
     
+    # Обработка кнопки "Показать все напитки"
     if user_message == "📋 Показать все напитки":
         available_drinks = "\n".join([f"• {drink}" for drink in DRINKS_DATABASE.keys()])
         await update.message.reply_text(
@@ -74,6 +78,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     
+    # Ищем напиток в базе (точное совпадение)
     found_drink = None
     for drink in DRINKS_DATABASE:
         if user_message.lower() == drink.lower():
@@ -83,36 +88,48 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if found_drink:
         file_path = DRINKS_DATABASE[found_drink]
         print(f"✅ Найден напиток: {found_drink}")
+        print(f"📁 Ищу файл по пути: {file_path}")
+        print(f"📂 Файл существует: {os.path.exists(file_path)}")
         
+        # Проверяем есть ли файл
         if os.path.exists(file_path):
             try:
-                with open(file_path, 'rb') as photo_file:
-                    photo_data = photo_file.read()
-                
-                await update.message.reply_photo(
-                    photo=photo_data,
-                    caption=f"📋 Техкарта: {found_drink}"
-                )
+                with open(file_path, 'rb') as photo:
+                    # Сначала отправляем фото
+                    await update.message.reply_photo(
+                        photo=photo,
+                        caption=f"📋 Техкарта: {found_drink}"
+                    )
                 print(f"✅ Техкарта отправлена для: {found_drink}")
                 
+                # Показываем клавиатуру снова после отправки
                 await update.message.reply_text(
                     "Выбери следующий напиток:",
                     reply_markup=create_drinks_keyboard()
                 )
                 
             except Exception as e:
-                print(f"❌ Ошибка: {e}")
+                error_msg = f"❌ Ошибка при отправке техкарты: {str(e)}"
+                print(error_msg)
                 await update.message.reply_text(
-                    "❌ Ошибка отправки. Попробуй еще раз.",
+                    error_msg,
                     reply_markup=create_drinks_keyboard()
                 )
         else:
-            print(f"❌ Файл не найден: {file_path}")
+            error_msg = f"❌ Файл техкарты для '{found_drink}' не найден\nПуть: {file_path}"
+            print(error_msg)
+            # Покажем список файлов в папке для отладки
+            tech_cards_dir = os.path.join(BASE_DIR, "tech_cards")
+            if os.path.exists(tech_cards_dir):
+                files = os.listdir(tech_cards_dir)
+                print(f"📂 Файлы в папке tech_cards: {files}")
+            
             await update.message.reply_text(
                 f"❌ Техкарта для '{found_drink}' временно недоступна",
                 reply_markup=create_drinks_keyboard()
             )
     else:
+        # Если напиток не найден, показываем подсказку
         await update.message.reply_text(
             f"❌ Напиток '{user_message}' не найден.\n\n"
             f"Нажми на кнопку с названием напитка ниже 👇",
@@ -132,23 +149,30 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     """Запуск бота"""
-    print("🚀 Бот запускается на Render...")
+    print("✅ Бот запускается...")
+    print(f"📁 Рабочая директория: {BASE_DIR}")
     print("📊 Напитки в базе:", list(DRINKS_DATABASE.keys()))
     
-    # Проверяем файлы
+    # Проверяем существование файлов
     print("🔍 Проверка файлов техкарт:")
     for drink, path in DRINKS_DATABASE.items():
         exists = "✅" if os.path.exists(path) else "❌"
-        print(f"  {exists} {drink}")
+        print(f"  {exists} {drink}: {os.path.basename(path)}")
     
+    # Создаем приложение бота
     application = Application.builder().token(BOT_TOKEN).build()
     
+    # Добавляем обработчики команд
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("menu", show_menu_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    
+    # Обработчик ошибок
     application.add_error_handler(error_handler)
     
-    print("🤖 Бот запущен и работает 24/7!")
+    # Запускаем бота
+    print("🤖 Бот запущен и готов к работе!")
+    print("⏹️  Для остановки нажми Ctrl+C")
     application.run_polling()
 
 if __name__ == "__main__":
