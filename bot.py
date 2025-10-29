@@ -1,7 +1,7 @@
 import os
 import logging
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackContext
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # Настройка логирования
 logging.basicConfig(
@@ -9,24 +9,25 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-# Токен бота
-BOT_TOKEN = "8204345196:AAGa9ckArC5xUNSixAMtwTlY_NMGFYGnzDk"
+# Токен бота из переменных окружения
+BOT_TOKEN = os.environ.get('BOT_TOKEN', '8204345196:AAGa9ckArC5xUNSixAMtwTlY_NMGFYGnzDk')
 
-# База напитков и их техкарт
+# БАЗА НАПИТКОВ - Railway автоматически определяет путь
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 DRINKS_DATABASE = {
-    "Афогато": "tech_cards/Афогато.png",
-    "Время лайма": "tech_cards/Время лайма.png",
-    "Гуанабана": "tech_cards/Гуанабана.png",
-    "Капучино Вареная сгущенка с халвой": "tech_cards/Капучино Сгущенка с халвой.png",
-    "Карибский ананас": "tech_cards/Карибский ананас.png",
-    "Личи-драгонфрут": "tech_cards/Личи-драгонфрут.png",
+    "Афогато": os.path.join(BASE_DIR, "tech_cards", "Афогато.PNG"),
+    "Время лайма": os.path.join(BASE_DIR, "tech_cards", "Время лайма.PNG"),
+    "Гуанабана": os.path.join(BASE_DIR, "tech_cards", "Гуанабана.PNG"),
+    "Капучино Вареная сгущенка с халвой": os.path.join(BASE_DIR, "tech_cards", "Капучино Вареная сгущенка с халвой.PNG"),
+    "Карибский ананас": os.path.join(BASE_DIR, "tech_cards", "Карибский ананас.PNG"),
+    "Личи-драгонфрут": os.path.join(BASE_DIR, "tech_cards", "Личи-драгонфрут.PNG"),
 }
 
 def create_drinks_keyboard():
     """Создает клавиатуру с кнопками напитков"""
     drinks = list(DRINKS_DATABASE.keys())
     
-    # Создаем кнопки (по 2 в ряд для красоты)
     keyboard = []
     for i in range(0, len(drinks), 2):
         row = []
@@ -36,7 +37,6 @@ def create_drinks_keyboard():
             row.append(KeyboardButton(drinks[i + 1]))
         keyboard.append(row)
     
-    # Добавляем кнопку "Показать все напитки"
     keyboard.append([KeyboardButton("📋 Показать все напитки")])
     
     return ReplyKeyboardMarkup(
@@ -55,7 +55,6 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ✨ Можно также написать название напитка вручную.
 """
     
-    # Отправляем сообщение с клавиатурой
     await update.message.reply_text(
         welcome_text,
         reply_markup=create_drinks_keyboard()
@@ -67,7 +66,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     print(f"🔍 Пользователь написал: '{user_message}'")
     
-    # Обработка кнопки "Показать все напитки"
     if user_message == "📋 Показать все напитки":
         available_drinks = "\n".join([f"• {drink}" for drink in DRINKS_DATABASE.keys()])
         await update.message.reply_text(
@@ -76,7 +74,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     
-    # Ищем напиток в базе (точное совпадение)
     found_drink = None
     for drink in DRINKS_DATABASE:
         if user_message.lower() == drink.lower():
@@ -85,38 +82,50 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if found_drink:
         file_path = DRINKS_DATABASE[found_drink]
-        print(f"✅ Найден напиток: {found_drink}, путь: {file_path}")
+        print(f"✅ Найден напиток: {found_drink}")
+        print(f"📁 Путь к файлу: {file_path}")
+        print(f"📂 Файл существует: {os.path.exists(file_path)}")
         
-        # Проверяем есть ли файл
         if os.path.exists(file_path):
             try:
-                with open(file_path, 'rb') as photo:
-                    # Сначала отправляем фото
-                    await update.message.reply_photo(
-                        photo=photo,
-                        caption=f"📋 Техкарта: {found_drink}"
-                    )
+                # Читаем файл в память
+                with open(file_path, 'rb') as photo_file:
+                    photo_data = photo_file.read()
+                
+                # Отправляем фото
+                await update.message.reply_photo(
+                    photo=photo_data,
+                    caption=f"📋 Техкарта: {found_drink}"
+                )
                 print(f"✅ Техкарта отправлена для: {found_drink}")
                 
-                # Показываем клавиатуру снова после отправки
+                # Показываем клавиатуру снова
                 await update.message.reply_text(
                     "Выбери следующий напиток:",
                     reply_markup=create_drinks_keyboard()
                 )
                 
             except Exception as e:
+                error_msg = f"❌ Ошибка при отправке: {str(e)}"
+                print(error_msg)
                 await update.message.reply_text(
-                    f"❌ Ошибка при отправке техкарты: {str(e)}",
+                    "❌ Ошибка отправки. Попробуй еще раз.",
                     reply_markup=create_drinks_keyboard()
                 )
         else:
+            # Покажем какие файлы есть в папке для отладки
+            tech_cards_path = os.path.join(BASE_DIR, "tech_cards")
+            if os.path.exists(tech_cards_path):
+                files = os.listdir(tech_cards_path)
+                print(f"📂 Файлы в tech_cards: {files}")
+            
+            error_msg = f"❌ Файл не найден: {file_path}"
+            print(error_msg)
             await update.message.reply_text(
-                f"❌ Файл техкарты для '{found_drink}' не найден\n"
-                f"Путь: {file_path}",
+                f"❌ Техкарта для '{found_drink}' временно недоступна",
                 reply_markup=create_drinks_keyboard()
             )
     else:
-        # Если напиток не найден, показываем подсказку
         await update.message.reply_text(
             f"❌ Напиток '{user_message}' не найден.\n\n"
             f"Нажми на кнопку с названием напитка ниже 👇",
@@ -136,24 +145,37 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     """Запуск бота"""
-    # Создаем папку для техкарт
-    os.makedirs("tech_cards", exist_ok=True)
+    print("🚀 Бот запускается на Railway...")
+    print(f"📁 Рабочая директория: {BASE_DIR}")
+    print("📊 Напитки в базе:", list(DRINKS_DATABASE.keys()))
+    
+    # Проверяем файлы
+    print("🔍 Проверка файлов техкарт:")
+    for drink, path in DRINKS_DATABASE.items():
+        exists = "✅" if os.path.exists(path) else "❌"
+        print(f"  {exists} {drink}: {os.path.basename(path)}")
+    
+    # Проверяем папку tech_cards
+    tech_cards_path = os.path.join(BASE_DIR, "tech_cards")
+    if os.path.exists(tech_cards_path):
+        files = os.listdir(tech_cards_path)
+        print(f"📂 Файлы в tech_cards: {files}")
+    else:
+        print("❌ Папка tech_cards не найдена!")
     
     # Создаем приложение бота
     application = Application.builder().token(BOT_TOKEN).build()
     
-    # Добавляем обработчики команд
+    # Добавляем обработчики
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("menu", show_menu_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    # Обработчик ошибок
     application.add_error_handler(error_handler)
     
     # Запускаем бота
-    print("✅ Бот запущен и готов к работе!")
-    print("📊 Напитки в базе:", list(DRINKS_DATABASE.keys()))
-    print("⏹️  Чтобы остановить бота, нажми Ctrl+C")
+    print("🤖 Бот запущен и работает 24/7 на Railway!")
+    print("⏹️  Бот будет работать постоянно")
     application.run_polling()
 
 if __name__ == "__main__":
