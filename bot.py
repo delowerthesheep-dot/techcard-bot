@@ -2,6 +2,7 @@ import os
 import logging
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from flask import Flask, request
 
 # Настройка логирования
 logging.basicConfig(
@@ -20,40 +21,25 @@ DRINKS_DATABASE = {
     "Кофе": {
         "Афогато": os.path.join(BASE_DIR, "tech_cards", "Афогато.PNG"),
         "Капучино Вареная сгущенка с халвой": os.path.join(BASE_DIR, "tech_cards", "Капучино Вареная сгущенка с халвой.PNG"),
-        "Эспрессо": os.path.join(BASE_DIR, "tech_cards", "Эспрессо.PNG"),
-        "Латте": os.path.join(BASE_DIR, "tech_cards", "Латте.PNG"),
-        "Американо": os.path.join(BASE_DIR, "tech_cards", "Американо.PNG"),
     },
     "Холодные напитки": {
         "Время лайма": os.path.join(BASE_DIR, "tech_cards", "Время лайма.PNG"),
         "Гуанабана": os.path.join(BASE_DIR, "tech_cards", "Гуанабана.PNG"),
         "Карибский ананас": os.path.join(BASE_DIR, "tech_cards", "Карибский ананас.PNG"),
         "Личи-драгонфрут": os.path.join(BASE_DIR, "tech_cards", "Личи-драгонфрут.PNG"),
-        "Мохито": os.path.join(BASE_DIR, "tech_cards", "Мохито.PNG"),
-    },
-    "Сезонные напитки": {
-        "Глинтвейн": os.path.join(BASE_DIR, "tech_cards", "Глинтвейн.PNG"),
-        "Тыквенный латте": os.path.join(BASE_DIR, "tech_cards", "Тыквенный латте.PNG"),
-        "Яблочный сидр": os.path.join(BASE_DIR, "tech_cards", "Яблочный сидр.PNG"),
-    },
-    "Чай": {
-        "Молочный улун": os.path.join(BASE_DIR, "tech_cards", "Молочный улун.PNG"),
-        "Эрл Грей": os.path.join(BASE_DIR, "tech_cards", "Эрл Грей.PNG"),
-        "Зеленый чай": os.path.join(BASE_DIR, "tech_cards", "Зеленый чай.PNG"),
-        "Чай масала": os.path.join(BASE_DIR, "tech_cards", "Чай масала.PNG"),
-    },
-    "Лимонады": {
-        "Классический лимонад": os.path.join(BASE_DIR, "tech_cards", "Классический лимонад.PNG"),
-        "Малиновый лимонад": os.path.join(BASE_DIR, "tech_cards", "Малиновый лимонад.PNG"),
-        "Мятный лимонад": os.path.join(BASE_DIR, "tech_cards", "Мятный лимонад.PNG"),
     }
 }
+
+# Создаем Flask приложение для обработки webhook
+app = Flask(__name__)
+
+# Глобальная переменная для бота
+application = None
 
 def create_main_keyboard():
     """Создает главную клавиатуру с категориями"""
     categories = list(DRINKS_DATABASE.keys())
     
-    # Создаем кнопки категорий (по 2 в ряд)
     keyboard = []
     for i in range(0, len(categories), 2):
         row = []
@@ -63,7 +49,6 @@ def create_main_keyboard():
             row.append(KeyboardButton(categories[i + 1]))
         keyboard.append(row)
     
-    # Добавляем кнопку "Все напитки"
     keyboard.append([KeyboardButton("📋 Все напитки")])
     
     return ReplyKeyboardMarkup(
@@ -76,7 +61,6 @@ def create_category_keyboard(category):
     """Создает клавиатуру с напитками выбранной категории"""
     drinks = list(DRINKS_DATABASE[category].keys())
     
-    # Создаем кнопки напитков (по 2 в ряд)
     keyboard = []
     for i in range(0, len(drinks), 2):
         row = []
@@ -86,7 +70,6 @@ def create_category_keyboard(category):
             row.append(KeyboardButton(drinks[i + 1]))
         keyboard.append(row)
     
-    # Добавляем кнопки навигации
     keyboard.append([KeyboardButton("⬅️ Назад к категориям"), KeyboardButton("🏠 Главное меню")])
     
     return ReplyKeyboardMarkup(
@@ -101,7 +84,6 @@ def create_all_drinks_keyboard():
     for category in DRINKS_DATABASE:
         all_drinks.extend(DRINKS_DATABASE[category].keys())
     
-    # Создаем кнопки всех напитков (по 2 в ряд)
     keyboard = []
     for i in range(0, len(all_drinks), 2):
         row = []
@@ -111,7 +93,6 @@ def create_all_drinks_keyboard():
             row.append(KeyboardButton(all_drinks[i + 1]))
         keyboard.append(row)
     
-    # Добавляем кнопки навигации
     keyboard.append([KeyboardButton("⬅️ Назад к категориям"), KeyboardButton("🏠 Главное меню")])
     
     return ReplyKeyboardMarkup(
@@ -135,7 +116,6 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 📊 **Всего напитков в базе:** {total_drinks}
 """.format(total_drinks=sum(len(drinks) for drinks in DRINKS_DATABASE.values()))
     
-    # Отправляем сообщение с главной клавиатурой
     await update.message.reply_text(
         welcome_text,
         reply_markup=create_main_keyboard()
@@ -195,21 +175,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if found_drink:
         file_path = DRINKS_DATABASE[found_category][found_drink]
         print(f"✅ Найден напиток: {found_drink} в категории: {found_category}")
-        print(f"📁 Ищу файл по пути: {file_path}")
-        print(f"📂 Файл существует: {os.path.exists(file_path)}")
         
-        # Проверяем есть ли файл
         if os.path.exists(file_path):
             try:
                 with open(file_path, 'rb') as photo:
-                    # Отправляем фото
                     await update.message.reply_photo(
                         photo=photo,
                         caption=f"📋 {found_drink}\n🏷️ Категория: {found_category}"
                     )
                 print(f"✅ Техкарта отправлена для: {found_drink}")
                 
-                # Показываем клавиатуру снова после отправки
                 await update.message.reply_text(
                     "Выбери следующий напиток:",
                     reply_markup=create_main_keyboard()
@@ -231,7 +206,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=create_main_keyboard()
             )
     else:
-        # Если напиток не найден, показываем подсказку
         await update.message.reply_text(
             f"❌ Напиток '{user_message}' не найден.\n\n"
             f"Выбери категорию напитков ниже 👇",
@@ -249,11 +223,24 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     """Обработка ошибок"""
     logging.error(f"Ошибка: {context.error}")
 
-def main():
-    """Запуск бота"""
-    print("✅ Бот запускается...")
+@app.route('/')
+def home():
+    return "🤖 Техкарт бот работает! Используйте Telegram бота для доступа."
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    """Обработчик webhook от Telegram"""
+    if application:
+        update = Update.de_json(request.get_json(), application.bot)
+        application.process_update(update)
+    return 'ok'
+
+def setup_bot():
+    """Настройка бота"""
+    global application
+    
+    print("✅ Настройка бота...")
     print(f"📁 Рабочая директория: {BASE_DIR}")
-    print(f"🔑 Токен бота: {BOT_TOKEN[:10]}...")  # Показываем только начало токена для безопасности
     
     # Показываем структуру базы данных
     print("📊 Структура базы данных:")
@@ -268,38 +255,38 @@ def main():
     
     print(f"🍹 Всего напитков: {total_drinks}")
     
-    try:
-        # Создаем приложение бота
-        application = Application.builder().token(BOT_TOKEN).build()
+    # Создаем приложение бота
+    application = Application.builder().token(BOT_TOKEN).build()
+    
+    # Добавляем обработчики команд
+    application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("menu", show_menu_command))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    
+    # Обработчик ошибок
+    application.add_error_handler(error_handler)
+    
+    # Настраиваем webhook
+    render_url = os.environ.get('RENDER_EXTERNAL_URL')
+    if render_url:
+        print(f"🌐 Настраиваем webhook для: {render_url}")
+        webhook_url = f"{render_url}/webhook"
         
-        # Добавляем обработчики команд
-        application.add_handler(CommandHandler("start", start_command))
-        application.add_handler(CommandHandler("menu", show_menu_command))
-        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-        
-        # Обработчик ошибок
-        application.add_error_handler(error_handler)
-        
-        # Запускаем бота с обработкой конфликта
-        print("🤖 Бот запущен и готов к работе!")
-        print("🔄 Режим: polling")
-        print("⏹️  Для остановки нажми Ctrl+C")
-        
-        # Запускаем с очисткой pending updates
-        application.run_polling(
-            drop_pending_updates=True,
-            allowed_updates=Update.ALL_TYPES
+        # Устанавливаем webhook
+        application.bot.set_webhook(
+            url=webhook_url,
+            secret_token='WEBHOOK_SECRET'
         )
-        
-    except Exception as e:
-        print(f"❌ Критическая ошибка при запуске: {e}")
-        print("🔄 Попытка перезапуска через 10 секунд...")
-        import time
-        time.sleep(10)
-        main()  # Перезапускаем бота
+        print(f"✅ Webhook установлен: {webhook_url}")
+    else:
+        print("❌ RENDER_EXTERNAL_URL не найден")
 
 if __name__ == "__main__":
-    main()
-
-if __name__ == "__main__":
-    main()
+    # Сначала настраиваем бота
+    setup_bot()
+    
+    # Затем запускаем Flask сервер
+    port = int(os.environ.get('PORT', 10000))
+    print(f"🚀 Запуск Flask сервера на порту {port}")
+    
+    app.run(host='0.0.0.0', port=port, debug=False)
