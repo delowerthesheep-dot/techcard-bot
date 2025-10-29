@@ -143,7 +143,7 @@ async def show_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=create_drinks_keyboard()
     )
 
-async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     """Обработка ошибок"""
     logging.error(f"Ошибка: {context.error}")
 
@@ -175,5 +175,7 @@ def main():
     print("⏹️  Для остановки нажми Ctrl+C")
     application.run_polling()
 
+if __name__ == "__main__":
+    main()
 if __name__ == "__main__":
     main()
