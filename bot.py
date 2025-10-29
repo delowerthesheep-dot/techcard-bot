@@ -15,20 +15,57 @@ BOT_TOKEN = os.environ.get('BOT_TOKEN', "8204345196:AAGa9ckArC5xUNSixAMtwTlY_NMG
 # На Render используем относительные пути
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+# База данных напитков по категориям
 DRINKS_DATABASE = {
-    "Афогато": os.path.join(BASE_DIR, "tech_cards", "Афогато.PNG"),
-    "Время лайма": os.path.join(BASE_DIR, "tech_cards", "Время лайма.PNG"),
-    "Гуанабана": os.path.join(BASE_DIR, "tech_cards", "Гуанабана.PNG"),
-    "Капучино Вареная сгущенка с халвой": os.path.join(BASE_DIR, "tech_cards", "Капучино Вареная сгущенка с халвой.PNG"),
-    "Карибский ананас": os.path.join(BASE_DIR, "tech_cards", "Карибский ананас.PNG"),
-    "Личи-драгонфрут": os.path.join(BASE_DIR, "tech_cards", "Личи-драгонфрут.PNG"),
+    "Кофе": {
+        "Афогато": os.path.join(BASE_DIR, "tech_cards", "Афогато.PNG"),
+        "Капучино Вареная сгущенка с халвой": os.path.join(BASE_DIR, "tech_cards", "Капучино Вареная сгущенка с халвой.PNG"),
+        # Можно добавить другие кофейные напитки
+    },
+    "Холодные напитки": {
+        "Время лайма": os.path.join(BASE_DIR, "tech_cards", "Время лайма.PNG"),
+        "Гуанабана": os.path.join(BASE_DIR, "tech_cards", "Гуанабана.PNG"),
+        "Карибский ананас": os.path.join(BASE_DIR, "tech_cards", "Карибский ананас.PNG"),
+        "Личи-драгонфрут": os.path.join(BASE_DIR, "tech_cards", "Личи-драгонфрут.PNG"),
+    },
+    "Сезонные напитки": {
+        # Добавь сезонные напитки здесь
+        "Глинтвейн": os.path.join(BASE_DIR, "tech_cards", "Глинтвейн.PNG"),
+    },
+    "Чай": {
+        # Добавь чайные напитки здесь
+        "Молочный улун": os.path.join(BASE_DIR, "tech_cards", "Молочный улун.PNG"),
+    }
 }
 
-def create_drinks_keyboard():
-    """Создает клавиатуру с кнопками напитков"""
-    drinks = list(DRINKS_DATABASE.keys())
+def create_main_keyboard():
+    """Создает главную клавиатуру с категориями"""
+    categories = list(DRINKS_DATABASE.keys())
     
-    # Создаем кнопки (по 2 в ряд для красоты)
+    # Создаем кнопки категорий (по 2 в ряд)
+    keyboard = []
+    for i in range(0, len(categories), 2):
+        row = []
+        if i < len(categories):
+            row.append(KeyboardButton(categories[i]))
+        if i + 1 < len(categories):
+            row.append(KeyboardButton(categories[i + 1]))
+        keyboard.append(row)
+    
+    # Добавляем кнопку "Все напитки"
+    keyboard.append([KeyboardButton("📋 Все напитки")])
+    
+    return ReplyKeyboardMarkup(
+        keyboard, 
+        resize_keyboard=True,
+        input_field_placeholder="Выбери категорию напитков 👇"
+    )
+
+def create_category_keyboard(category):
+    """Создает клавиатуру с напитками выбранной категории"""
+    drinks = list(DRINKS_DATABASE[category].keys())
+    
+    # Создаем кнопки напитков (по 2 в ряд)
     keyboard = []
     for i in range(0, len(drinks), 2):
         row = []
@@ -38,13 +75,38 @@ def create_drinks_keyboard():
             row.append(KeyboardButton(drinks[i + 1]))
         keyboard.append(row)
     
-    # Добавляем кнопку "Показать все напитки"
-    keyboard.append([KeyboardButton("📋 Показать все напитки")])
+    # Добавляем кнопки навигации
+    keyboard.append([KeyboardButton("⬅️ Назад к категориям"), KeyboardButton("🏠 Главное меню")])
     
     return ReplyKeyboardMarkup(
         keyboard, 
         resize_keyboard=True,
-        input_field_placeholder="Выбери напиток или нажми кнопку ниже 👇"
+        input_field_placeholder="Выбери напиток 👇"
+    )
+
+def create_all_drinks_keyboard():
+    """Создает клавиатуру со всеми напитками"""
+    all_drinks = []
+    for category in DRINKS_DATABASE:
+        all_drinks.extend(DRINKS_DATABASE[category].keys())
+    
+    # Создаем кнопки всех напитков (по 2 в ряд)
+    keyboard = []
+    for i in range(0, len(all_drinks), 2):
+        row = []
+        if i < len(all_drinks):
+            row.append(KeyboardButton(all_drinks[i]))
+        if i + 1 < len(all_drinks):
+            row.append(KeyboardButton(all_drinks[i + 1]))
+        keyboard.append(row)
+    
+    # Добавляем кнопки навигации
+    keyboard.append([KeyboardButton("⬅️ Назад к категориям"), KeyboardButton("🏠 Главное меню")])
+    
+    return ReplyKeyboardMarkup(
+        keyboard, 
+        resize_keyboard=True,
+        input_field_placeholder="Выбери напиток 👇"
     )
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -52,15 +114,15 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = """
 👋 Привет! Я бот для поиска техкарт напитков.
 
-📝 Просто нажми на кнопку с названием напитка ниже, и я отправлю его техкарту.
+📝 Выбери категорию напитков ниже, затем конкретный напиток - и я отправлю его техкарту.
 
 ✨ Можно также написать название напитка вручную.
 """
     
-    # Отправляем сообщение с клавиатурой
+    # Отправляем сообщение с главной клавиатурой
     await update.message.reply_text(
         welcome_text,
-        reply_markup=create_drinks_keyboard()
+        reply_markup=create_main_keyboard()
     )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -69,25 +131,54 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     print(f"🔍 Пользователь написал: '{user_message}'")
     
-    # Обработка кнопки "Показать все напитки"
-    if user_message == "📋 Показать все напитки":
-        available_drinks = "\n".join([f"• {drink}" for drink in DRINKS_DATABASE.keys()])
+    # Обработка навигационных кнопок
+    if user_message == "🏠 Главное меню":
         await update.message.reply_text(
-            f"🍹 Все доступные напитки:\n\n{available_drinks}\n\n"
-            f"Нажми на кнопку с названием напитка 👆"
+            "Возвращаемся в главное меню:",
+            reply_markup=create_main_keyboard()
+        )
+        return
+        
+    elif user_message == "⬅️ Назад к категориям":
+        await update.message.reply_text(
+            "Выбери категорию напитков:",
+            reply_markup=create_main_keyboard()
+        )
+        return
+        
+    elif user_message == "📋 Все напитки":
+        all_drinks_count = sum(len(drinks) for drinks in DRINKS_DATABASE.values())
+        await update.message.reply_text(
+            f"🍹 Все напитки ({all_drinks_count}):",
+            reply_markup=create_all_drinks_keyboard()
         )
         return
     
-    # Ищем напиток в базе (точное совпадение)
+    # Проверяем категории
+    if user_message in DRINKS_DATABASE:
+        drinks_count = len(DRINKS_DATABASE[user_message])
+        await update.message.reply_text(
+            f"🍹 {user_message} ({drinks_count} напитков):",
+            reply_markup=create_category_keyboard(user_message)
+        )
+        return
+    
+    # Ищем напиток в базе (по всем категориям)
     found_drink = None
-    for drink in DRINKS_DATABASE:
-        if user_message.lower() == drink.lower():
-            found_drink = drink
+    found_category = None
+    
+    for category, drinks in DRINKS_DATABASE.items():
+        for drink in drinks:
+            if user_message.lower() == drink.lower():
+                found_drink = drink
+                found_category = category
+                break
+        if found_drink:
             break
     
     if found_drink:
-        file_path = DRINKS_DATABASE[found_drink]
-        print(f"✅ Найден напиток: {found_drink}")
+        file_path = DRINKS_DATABASE[found_category][found_drink]
+        print(f"✅ Найден напиток: {found_drink} в категории: {found_category}")
         print(f"📁 Ищу файл по пути: {file_path}")
         print(f"📂 Файл существует: {os.path.exists(file_path)}")
         
@@ -95,17 +186,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(file_path):
             try:
                 with open(file_path, 'rb') as photo:
-                    # Сначала отправляем фото
+                    # Отправляем фото
                     await update.message.reply_photo(
                         photo=photo,
-                        caption=f"📋 Техкарта: {found_drink}"
+                        caption=f"📋 {found_drink}\n🏷️ Категория: {found_category}"
                     )
                 print(f"✅ Техкарта отправлена для: {found_drink}")
                 
                 # Показываем клавиатуру снова после отправки
                 await update.message.reply_text(
                     "Выбери следующий напиток:",
-                    reply_markup=create_drinks_keyboard()
+                    reply_markup=create_main_keyboard()
                 )
                 
             except Exception as e:
@@ -113,34 +204,29 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 print(error_msg)
                 await update.message.reply_text(
                     error_msg,
-                    reply_markup=create_drinks_keyboard()
+                    reply_markup=create_main_keyboard()
                 )
         else:
-            error_msg = f"❌ Файл техкарты для '{found_drink}' не найден\nПуть: {file_path}"
+            error_msg = f"❌ Файл техкарты для '{found_drink}' не найден"
             print(error_msg)
-            # Покажем список файлов в папке для отладки
-            tech_cards_dir = os.path.join(BASE_DIR, "tech_cards")
-            if os.path.exists(tech_cards_dir):
-                files = os.listdir(tech_cards_dir)
-                print(f"📂 Файлы в папке tech_cards: {files}")
             
             await update.message.reply_text(
                 f"❌ Техкарта для '{found_drink}' временно недоступна",
-                reply_markup=create_drinks_keyboard()
+                reply_markup=create_main_keyboard()
             )
     else:
         # Если напиток не найден, показываем подсказку
         await update.message.reply_text(
             f"❌ Напиток '{user_message}' не найден.\n\n"
-            f"Нажми на кнопку с названием напитка ниже 👇",
-            reply_markup=create_drinks_keyboard()
+            f"Выбери категорию напитков ниже 👇",
+            reply_markup=create_main_keyboard()
         )
 
 async def show_menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Команда /menu - показать меню кнопок"""
+    """Команда /menu - показать главное меню"""
     await update.message.reply_text(
-        "🍹 Выбери напиток:",
-        reply_markup=create_drinks_keyboard()
+        "🏠 Главное меню:",
+        reply_markup=create_main_keyboard()
     )
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
@@ -151,13 +237,13 @@ def main():
     """Запуск бота"""
     print("✅ Бот запускается...")
     print(f"📁 Рабочая директория: {BASE_DIR}")
-    print("📊 Напитки в базе:", list(DRINKS_DATABASE.keys()))
     
-    # Проверяем существование файлов
-    print("🔍 Проверка файлов техкарт:")
-    for drink, path in DRINKS_DATABASE.items():
-        exists = "✅" if os.path.exists(path) else "❌"
-        print(f"  {exists} {drink}: {os.path.basename(path)}")
+    # Показываем структуру базы данных
+    print("📊 Структура базы данных:")
+    for category, drinks in DRINKS_DATABASE.items():
+        print(f"  🏷️ {category}: {len(drinks)} напитков")
+        for drink in drinks:
+            print(f"    🍹 {drink}")
     
     # Создаем приложение бота
     application = Application.builder().token(BOT_TOKEN).build()
@@ -175,7 +261,5 @@ def main():
     print("⏹️  Для остановки нажми Ctrl+C")
     application.run_polling()
 
-if __name__ == "__main__":
-    main()
 if __name__ == "__main__":
     main()
