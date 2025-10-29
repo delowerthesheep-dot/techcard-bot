@@ -1,8 +1,8 @@
 import os
 import logging
+import time
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from flask import Flask, request
 
 # Настройка логирования
 logging.basicConfig(
@@ -10,7 +10,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-# Токен нового бота
+# Токен бота
 BOT_TOKEN = os.environ.get('BOT_TOKEN', "8390604966:AAE39zuCSl9vfUjPZERJ2ncR8mTBrXr9rBU")
 
 # На Render используем относительные пути
@@ -29,12 +29,6 @@ DRINKS_DATABASE = {
         "Личи-драгонфрут": os.path.join(BASE_DIR, "tech_cards", "Личи-драгонфрут.PNG"),
     }
 }
-
-# Создаем Flask приложение для обработки webhook
-app = Flask(__name__)
-
-# Глобальная переменная для бота
-application = None
 
 def create_main_keyboard():
     """Создает главную клавиатуру с категориями"""
@@ -223,23 +217,9 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     """Обработка ошибок"""
     logging.error(f"Ошибка: {context.error}")
 
-@app.route('/')
-def home():
-    return "🤖 Техкарт бот работает! Используйте Telegram бота для доступа."
-
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    """Обработчик webhook от Telegram"""
-    if application:
-        update = Update.de_json(request.get_json(), application.bot)
-        application.process_update(update)
-    return 'ok'
-
-def setup_bot():
-    """Настройка бота"""
-    global application
-    
-    print("✅ Настройка бота...")
+def main():
+    """Основная функция с бесконечным циклом"""
+    print("🚀 Запуск Telegram бота...")
     print(f"📁 Рабочая директория: {BASE_DIR}")
     
     # Показываем структуру базы данных
@@ -255,38 +235,38 @@ def setup_bot():
     
     print(f"🍹 Всего напитков: {total_drinks}")
     
-    # Создаем приложение бота
-    application = Application.builder().token(BOT_TOKEN).build()
-    
-    # Добавляем обработчики команд
-    application.add_handler(CommandHandler("start", start_command))
-    application.add_handler(CommandHandler("menu", show_menu_command))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    
-    # Обработчик ошибок
-    application.add_error_handler(error_handler)
-    
-    # Настраиваем webhook
-    render_url = os.environ.get('RENDER_EXTERNAL_URL')
-    if render_url:
-        print(f"🌐 Настраиваем webhook для: {render_url}")
-        webhook_url = f"{render_url}/webhook"
-        
-        # Устанавливаем webhook
-        application.bot.set_webhook(
-            url=webhook_url,
-            secret_token='WEBHOOK_SECRET'
-        )
-        print(f"✅ Webhook установлен: {webhook_url}")
-    else:
-        print("❌ RENDER_EXTERNAL_URL не найден")
+    # Бесконечный цикл для перезапуска при ошибках
+    while True:
+        try:
+            print("🤖 Создаем приложение бота...")
+            
+            # Создаем приложение бота
+            application = Application.builder().token(BOT_TOKEN).build()
+            
+            # Добавляем обработчики команд
+            application.add_handler(CommandHandler("start", start_command))
+            application.add_handler(CommandHandler("menu", show_menu_command))
+            application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+            
+            # Обработчик ошибок
+            application.add_error_handler(error_handler)
+            
+            # Запускаем бота в режиме polling
+            print("✅ Бот успешно запущен!")
+            print("🔍 Режим: polling (ожидание сообщений)")
+            print("📱 Бот готов к работе!")
+            print("⏹️  Для остановки перезапусти сервис в Render")
+            
+            application.run_polling(
+                drop_pending_updates=True,
+                allowed_updates=Update.ALL_TYPES,
+                close_loop=False
+            )
+            
+        except Exception as e:
+            print(f"❌ Произошла ошибка: {e}")
+            print("🔄 Перезапуск через 10 секунд...")
+            time.sleep(10)
 
 if __name__ == "__main__":
-    # Сначала настраиваем бота
-    setup_bot()
-    
-    # Затем запускаем Flask сервер
-    port = int(os.environ.get('PORT', 10000))
-    print(f"🚀 Запуск Flask сервера на порту {port}")
-    
-    app.run(host='0.0.0.0', port=port, debug=False)
+    main()
