@@ -1,6 +1,5 @@
 import os
 import logging
-import time
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
@@ -10,10 +9,10 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-# Токен бота
+# Токен бота из переменных окружения
 BOT_TOKEN = os.environ.get('BOT_TOKEN', "8390604966:AAE39zuCSl9vfUjPZERJ2ncR8mTBrXr9rBU")
 
-# На Render используем относительные пути
+# На Koyeb используем относительные пути
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # База данных напитков по категориям
@@ -218,8 +217,8 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     logging.error(f"Ошибка: {context.error}")
 
 def main():
-    """Основная функция с бесконечным циклом"""
-    print("🚀 Запуск Telegram бота...")
+    """Запуск бота"""
+    print("🚀 Запуск Telegram бота на Koyeb...")
     print(f"📁 Рабочая директория: {BASE_DIR}")
     
     # Показываем структуру базы данных
@@ -235,38 +234,26 @@ def main():
     
     print(f"🍹 Всего напитков: {total_drinks}")
     
-    # Бесконечный цикл для перезапуска при ошибках
-    while True:
-        try:
-            print("🤖 Создаем приложение бота...")
-            
-            # Создаем приложение бота
-            application = Application.builder().token(BOT_TOKEN).build()
-            
-            # Добавляем обработчики команд
-            application.add_handler(CommandHandler("start", start_command))
-            application.add_handler(CommandHandler("menu", show_menu_command))
-            application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-            
-            # Обработчик ошибок
-            application.add_error_handler(error_handler)
-            
-            # Запускаем бота в режиме polling
-            print("✅ Бот успешно запущен!")
-            print("🔍 Режим: polling (ожидание сообщений)")
-            print("📱 Бот готов к работе!")
-            print("⏹️  Для остановки перезапусти сервис в Render")
-            
-            application.run_polling(
-                drop_pending_updates=True,
-                allowed_updates=Update.ALL_TYPES,
-                close_loop=False
-            )
-            
-        except Exception as e:
-            print(f"❌ Произошла ошибка: {e}")
-            print("🔄 Перезапуск через 10 секунд...")
-            time.sleep(10)
+    # Создаем приложение бота
+    application = Application.builder().token(BOT_TOKEN).build()
+    
+    # Добавляем обработчики команд
+    application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("menu", show_menu_command))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    
+    # Обработчик ошибок
+    application.add_error_handler(error_handler)
+    
+    # Запускаем бота
+    print("🤖 Бот запущен и готов к работе!")
+    print("🔍 Режим: polling")
+    print("⏹️  Бот будет работать 24/7")
+    
+    application.run_polling(
+        drop_pending_updates=True,
+        allowed_updates=Update.ALL_TYPES
+    )
 
 if __name__ == "__main__":
     main()
